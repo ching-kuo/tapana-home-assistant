@@ -74,13 +74,16 @@ class SonyTapanaConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     ) -> FlowResult:
         """Let the user pick which discovered device to add."""
         if user_input is not None:
-            node_id = int(user_input[CONF_NODE_ID])
+            key = user_input[CONF_NODE_ID]
+            title = self._devices.get(key) or f"Sony LGTG (node {key})"
+            # The cloud returns ids as floats (e.g. "1429475.0"); store as int.
+            node_id = int(float(key))
 
             await self.async_set_unique_id(f"sony_tapana_{node_id}")
             self._abort_if_unique_id_configured()
 
             return self.async_create_entry(
-                title=self._devices.get(str(node_id)) or f"Sony LGTG (node {node_id})",
+                title=title,
                 data={
                     CONF_EMAIL: self._email,
                     CONF_PASSWORD: self._password,
