@@ -11,7 +11,7 @@ from homeassistant.const import CONF_EMAIL, CONF_PASSWORD
 from homeassistant.data_entry_flow import FlowResult
 
 from .const import CONF_NODE_ID, DOMAIN
-from .tapana_client import AuthenticationError, SonyMflightError, TapanaClient
+from .tapana_client import AuthenticationError, Node, SonyMflightError, TapanaClient
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -19,7 +19,6 @@ STEP_USER_SCHEMA = vol.Schema(
     {
         vol.Required(CONF_EMAIL): str,
         vol.Required(CONF_PASSWORD): str,
-        vol.Required(CONF_NODE_ID): vol.Coerce(int),
     }
 )
 
@@ -29,21 +28,23 @@ class SonyTapanaConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     VERSION = 1
 
+    def __init__(self) -> None:
+        self._email: str = ""
+        self._password: str = ""
+        self._devices: dict[str, str] = {}
+
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
+        """Collect credentials and discover the account's devices."""
         errors: dict[str, str] = {}
 
         if user_input is not None:
             email = user_input[CONF_EMAIL]
             password = user_input[CONF_PASSWORD]
-            node_id = user_input[CONF_NODE_ID]
-
-            await self.async_set_unique_id(f"sony_tapana_{node_id}")
-            self._abort_if_unique_id_configured()
 
             try:
-                await self._test_credentials(email, password, node_id)
+                nodes = await self._fetch_nodes(email, password)
             except AuthenticationError:
                 errors["base"] = "invalid_auth"
             except SonyMflightError:
@@ -52,14 +53,15 @@ class SonyTapanaConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 _LOGGER.exception("Unexpected error during config flow")
                 errors["base"] = "unknown"
             else:
-                return self.async_create_entry(
-                    title=f"Sony LGTG (node {node_id})",
-                    data={
-                        CONF_EMAIL: email,
-                        CONF_PASSWORD: password,
-                        CONF_NODE_ID: node_id,
-                    },
-                )
+                if not nodes:
+                    errors["base"] = "no_devices"
+                else:
+                    self._email = email
+                    self._password = password
+                    self._devices = {
+                        str(n.id): (n.name or f"Node {n.id}") for n in nodes
+                    }
+                    return await self.async_step_select_device()
 
         return self.async_show_form(
             step_id="user",
@@ -67,15 +69,37 @@ class SonyTapanaConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             errors=errors,
         )
 
-    async def _test_credentials(
-        self, email: str, password: str, node_id: int
-    ) -> None:
-        """Validate credentials and that the node ID exists.
+    async def async_step_select_device(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Let the user pick which discovered device to add."""
+        if user_input is not None:
+            node_id = int(user_input[CONF_NODE_ID])
+
+            await self.async_set_unique_id(f"sony_tapana_{node_id}")
+            self._abort_if_unique_id_configured()
+
+            return self.async_create_entry(
+                title=self._devices.get(str(node_id)) or f"Sony LGTG (node {node_id})",
+                data={
+                    CONF_EMAIL: self._email,
+                    CONF_PASSWORD: self._password,
+                    CONF_NODE_ID: node_id,
+                },
+            )
+
+        return self.async_show_form(
+            step_id="select_device",
+            data_schema=vol.Schema({vol.Required(CONF_NODE_ID): vol.In(self._devices)}),
+        )
+
+    async def _fetch_nodes(self, email: str, password: str) -> list[Node]:
+        """Authenticate and list the account's devices.
 
         authenticate() raises AuthenticationError on bad credentials.
-        get_node() raises ApiError (a SonyMflightError) when the cloud is
-        unreachable or the node ID is unknown; both surface as cannot_connect.
+        get_nodes() raises ApiError (a SonyMflightError) when the cloud is
+        unreachable; both surface to the caller for mapping.
         """
-        client = TapanaClient(email=email, password=password, node_id=node_id)
+        client = TapanaClient(email=email, password=password, node_id=0)
         await self.hass.async_add_executor_job(client.authenticate)
-        await self.hass.async_add_executor_job(client.get_node)
+        return await self.hass.async_add_executor_job(client.get_nodes)

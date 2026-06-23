@@ -3,17 +3,24 @@
     "step": {
       "user": {
         "title": "Sony LGTG Multifunctional Light",
-        "description": "Enter your Tapana account credentials and the device node ID.",
+        "description": "Enter your Tapana account credentials. Your devices are discovered automatically.",
         "data": {
           "email": "Email",
-          "password": "Password",
-          "node_id": "Node ID"
+          "password": "Password"
+        }
+      },
+      "select_device": {
+        "title": "Select device",
+        "description": "Choose the device to add.",
+        "data": {
+          "node_id": "Device"
         }
       }
     },
     "error": {
       "invalid_auth": "Invalid email or password.",
-      "cannot_connect": "Could not reach the Tapana cloud, or the node ID was not found. Check your connection and the node ID.",
+      "cannot_connect": "Could not reach the Tapana cloud. Check your connection and try again.",
+      "no_devices": "No devices were found on this account.",
       "unknown": "An unexpected error occurred. Check the Home Assistant logs for details."
     },
     "abort": {

@@ -456,6 +456,12 @@ class TapanaClient:
             raise ApiError("getNodesNodeId returned empty data")
         return Node.from_api(raw)
 
+    def get_nodes(self) -> list[Node]:
+        """Fetch all nodes (devices) registered to the account."""
+        data = self._call(_GET_NODES_QUERY, variables={})
+        raw = data.get("getNodes") or []
+        return [Node.from_api(n) for n in raw if n]
+
     def get_light_state(self) -> LightState:
         """Return the current light state."""
         return _parse_light_state(self.get_node())

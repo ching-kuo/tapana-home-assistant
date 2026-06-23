@@ -62,22 +62,12 @@ State is polled from the cloud every 30 seconds.
 1. Go to **Settings > Devices & Services**.
 2. Click **Add Integration**.
 3. Search for **Sony LGTG**.
-4. Enter your Tapana account email, password, and the node ID of your device.
-5. Click **Submit**.
+4. Enter your Tapana account email and password, then click **Submit**.
+5. The integration authenticates and lists the devices on your account. Pick
+   your light from the dropdown and click **Submit**.
 
-The integration will authenticate against the Tapana cloud and begin polling your device.
-
-## Finding Your Node ID
-
-The node ID is a numeric identifier assigned to your LGTG device in the Tapana cloud.
-
-To find it:
-
-1. Open the Tapana or MFlight mobile app.
-2. Navigate to **Settings > Device Info** for your light.
-3. The node ID is displayed there (it is a numeric string, e.g. `123456`).
-
-Alternatively, if you have access to the raw API response after logging in, the node ID appears as the `id` field in the device list returned by the cloud.
+The integration then begins polling the selected device. No node ID lookup is
+required -- devices are discovered automatically from your account.
 
 ## Entities
 
