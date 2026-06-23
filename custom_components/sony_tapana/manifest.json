@@ -1,7 +1,7 @@
 {
   "domain": "sony_tapana",
   "name": "Sony LGTG Multifunctional Light (Tapana Cloud)",
-  "version": "0.2.3",
+  "version": "0.3.0",
   "config_flow": true,
   "documentation": "https://github.com/ching-kuo/tapana-home-assistant",
   "issue_tracker": "https://github.com/ching-kuo/tapana-home-assistant/issues",

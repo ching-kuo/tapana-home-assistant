@@ -36,18 +36,17 @@ from .const import (
     IDENTITY_POOL_ID,
     LOGINS_KEY,
     REGION,
-    SENSOR_BRIGHTNESS,
-    SENSOR_COLOR_TEMP,
     SENSOR_CONNECTED,
     SENSOR_HUMIDITY,
     SENSOR_ILLUMINANCE_AMB,
-    SENSOR_MODE,
-    SENSOR_PRESENCE,
-    SENSOR_STATUS,
+    SENSOR_MOTION,
     SENSOR_TEMPERATURE,
     SIG_ABSOLUTE,
     SIG_POWER,
     SIG_SET,
+    SLOT_BRIGHTNESS,
+    SLOT_COLOR_TEMP,
+    SLOT_LIGHT_POWER,
     TOKEN_REFRESH_BUFFER_S,
     USER_POOL_ID,
 )
@@ -135,45 +134,47 @@ def _sigv4_signing_key(secret_key: str, date_stamp: str, region: str, service: s
     return _hmac_digest(k_service, "aws4_request")
 
 
+def _slot_of(composite_id: str) -> int | None:
+    """Return the slot index from a compositeId like "<nodeId>:<slot>"."""
+    if composite_id and ":" in composite_id:
+        try:
+            return int(composite_id.rsplit(":", 1)[1])
+        except ValueError:
+            return None
+    return None
+
+
 def _parse_light_state(node: Node) -> LightState:
-    """Extract LightState from a Node's data list."""
-    by_type: dict[int, str] = {
-        nd.node_data_type_id: nd.value for nd in node.node_data_list
-    }
+    """Extract LightState from a Node's data list (keyed by slot)."""
+    by_slot: dict[int, str] = {}
+    for nd in node.node_data_list:
+        slot = _slot_of(nd.composite_id)
+        if slot is not None:
+            by_slot[slot] = nd.value
 
     state = LightState()
 
-    raw_brightness = by_type.get(SENSOR_BRIGHTNESS)
+    power = by_slot.get(SLOT_LIGHT_POWER)
+    if power is not None:
+        low = str(power).lower()
+        if low in ("on", "true", "1"):
+            state.is_on = True
+        elif low in ("off", "false", "0"):
+            state.is_on = False
+
+    raw_brightness = by_slot.get(SLOT_BRIGHTNESS)
     if raw_brightness is not None:
         try:
             state.brightness_pct = int(float(raw_brightness))
         except (ValueError, TypeError):
             pass
 
-    raw_color_temp = by_type.get(SENSOR_COLOR_TEMP)
+    raw_color_temp = by_slot.get(SLOT_COLOR_TEMP)
     if raw_color_temp is not None:
         try:
-            state.color_temp_pct = int(float(raw_color_temp))
-        except (ValueError, TypeError):
-            pass
-
-    raw_mode = by_type.get(SENSOR_MODE)
-    if raw_mode is not None:
-        state.mode = raw_mode
-        low = raw_mode.lower()
-        if "off" in low:
-            state.is_on = False
-        elif low not in ("", "null", "none"):
-            state.is_on = True
-
-    raw_status = by_type.get(SENSOR_STATUS)
-    if raw_status:
-        try:
-            status_data = json.loads(raw_status)
-            if isinstance(status_data, dict):
-                power = status_data.get("power")
-                if power is not None:
-                    state.is_on = str(power).lower() in ("true", "1")
+            # The phone app can set values >100 on a different scale; clamp so
+            # the kelvin conversion stays within the advertised range.
+            state.color_temp_pct = max(0, min(100, int(float(raw_color_temp))))
         except (ValueError, TypeError):
             pass
 
@@ -181,7 +182,7 @@ def _parse_light_state(node: Node) -> LightState:
 
 
 def _parse_sensor_data(node: Node) -> SensorData:
-    """Extract SensorData from a Node's data list."""
+    """Extract SensorData from a Node's data list (keyed by typeId)."""
     by_type: dict[int, str] = {
         nd.node_data_type_id: nd.value for nd in node.node_data_list
     }
@@ -201,11 +202,12 @@ def _parse_sensor_data(node: Node) -> SensorData:
             return None
         return raw.lower() in ("true", "1", "yes")
 
+    motion = _float(SENSOR_MOTION)
     return SensorData(
         temperature=_float(SENSOR_TEMPERATURE),
         humidity=_float(SENSOR_HUMIDITY),
         illuminance=_float(SENSOR_ILLUMINANCE_AMB),
-        presence=_bool(SENSOR_PRESENCE),
+        presence=(motion > 0) if motion is not None else None,
         connected=_bool(SENSOR_CONNECTED),
     )
 
@@ -449,7 +451,9 @@ class TapanaClient:
         """Fetch the current node state from the cloud API."""
         data = self._call(
             _GET_NODE_QUERY,
-            variables={"nodeId": str(self._node_id)},
+            # extraNodeData="true" is required for nodeDataList (light/sensor
+            # state) to be populated; without it the list comes back empty.
+            variables={"nodeId": str(self._node_id), "extraNodeData": "true"},
         )
         raw = data.get("getNodesNodeId")
         if not raw:

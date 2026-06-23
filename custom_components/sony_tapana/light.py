@@ -115,8 +115,9 @@ class SonyTapanaLight(CoordinatorEntity[TapanaCoordinator], LightEntity):
                 (kelvin - MIN_KELVIN) * 100 / (MAX_KELVIN - MIN_KELVIN)
             )
             try:
+                # Device rejects 0; valid color-temp range is 1-100.
                 await self.hass.async_add_executor_job(
-                    client.set_color_temperature, max(0, min(100, pct))
+                    client.set_color_temperature, max(1, min(100, pct))
                 )
             except (CommandError, InvalidParamsError):
                 _LOGGER.warning("Failed to set color temperature to %d K", kelvin)

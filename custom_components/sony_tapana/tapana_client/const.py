@@ -49,22 +49,22 @@ SIG_POWER = "power"
 SIG_ABSOLUTE = "absolute"
 SIG_SET = "set"
 
-# Sensor data type IDs
-SENSOR_PRESENCE = 100          # Motion detected (Boolean)
-SENSOR_ILLUMINANCE_AMB = 102   # Ambient illuminance (Float, lumen 0-100)
+# Node-data slots for the light's own channels.
+# The live API populates nodeDataList only when getNodes/getNodesNodeId is called
+# with extraNodeData="true". Within that list, typeIds 107 and 704 repeat across
+# several channels (brightness vs nightlight; light vs TV/AC), so the light is
+# keyed by its slot index from compositeId "<nodeId>:<slot>" rather than typeId.
+# These slots are fixed by the LGTG-200 device template.
+SLOT_LIGHT_POWER = 5    # type 704, value "on"/"off"
+SLOT_BRIGHTNESS = 10    # type 107, 0-100
+SLOT_COLOR_TEMP = 11    # type 108, 0-100 (0=warm, 100=cool)
+
+# Sensor data type IDs (unique within the node, so keyed by typeId)
+SENSOR_ILLUMINANCE_AMB = 102   # Ambient illuminance (lux)
 SENSOR_CONNECTED = 104         # Device online (Boolean)
-SENSOR_BRIGHTNESS = 106        # Current brightness (String)
-SENSOR_ILLUMINANCE = 107       # Illuminance setting (Long)
-SENSOR_COLOR_TEMP = 108        # Color temperature setting (Long)
 SENSOR_TEMPERATURE = 400       # Temperature (Float, -30 to 50 C)
 SENSOR_HUMIDITY = 401          # Humidity (Float, 0-100 %)
-SENSOR_FAN_SPEED = 402         # Aircon fan speed (String)
-SENSOR_TEMP_SETTING = 403      # Aircon target temperature (String)
-SENSOR_STATUS = 704            # Various status fields
-SENSOR_MODE = 705              # Operating mode (String)
-SENSOR_SECURE = 902            # Security mode
-SENSOR_SECURE_NODE = 954       # Node secure mode (Boolean)
-SENSOR_OP_ACCEPT = 963         # Device accepts commands (Boolean)
+SENSOR_MOTION = 611            # Motion detection count (0 = no motion)
 
 # Error codes returned in postActions response
 ERROR_OK = None          # null -> success
