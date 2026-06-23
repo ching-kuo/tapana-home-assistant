@@ -13,8 +13,8 @@ from homeassistant.components.sensor import (
 )
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
+    LIGHT_LUX,
     PERCENTAGE,
-    UnitOfIlluminance,
     UnitOfTemperature,
 )
 from homeassistant.core import HomeAssistant
@@ -57,7 +57,7 @@ SENSORS: tuple[TapanaSensorDescription, ...] = (
         name="Illuminance",
         device_class=SensorDeviceClass.ILLUMINANCE,
         state_class=SensorStateClass.MEASUREMENT,
-        native_unit_of_measurement=UnitOfIlluminance.LUX,
+        native_unit_of_measurement=LIGHT_LUX,
         value_fn=lambda s: s.illuminance,
     ),
 )
