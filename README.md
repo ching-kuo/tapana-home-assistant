@@ -30,7 +30,7 @@ State is polled from the cloud every 30 seconds.
 ## Prerequisites
 
 - A Tapana account (register via the Tapana or MFlight mobile app)
-- Your device's node ID (a numeric identifier — see [Finding Your Node ID](#finding-your-node-id))
+- Your device registered to that account (it is discovered automatically — no node ID lookup needed)
 - Home Assistant 2024.1 or newer
 - Python 3.11 or newer
 

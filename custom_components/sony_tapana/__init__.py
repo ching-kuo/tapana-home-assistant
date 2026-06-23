@@ -7,10 +7,11 @@ import logging
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_EMAIL, CONF_PASSWORD, Platform
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
 
 from .const import CONF_NODE_ID, DOMAIN
 from .coordinator import TapanaCoordinator
-from .tapana_client import TapanaClient
+from .tapana_client import AuthenticationError, SonyMflightError, TapanaClient
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -25,7 +26,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         node_id=entry.data[CONF_NODE_ID],
     )
 
-    await hass.async_add_executor_job(client.authenticate)
+    try:
+        await hass.async_add_executor_job(client.authenticate)
+    except AuthenticationError as exc:
+        raise ConfigEntryAuthFailed(str(exc)) from exc
+    except SonyMflightError as exc:
+        raise ConfigEntryNotReady(str(exc)) from exc
 
     coordinator = TapanaCoordinator(hass, client)
     await coordinator.async_config_entry_first_refresh()

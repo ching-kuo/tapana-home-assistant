@@ -56,7 +56,7 @@ from .exceptions import (
     CommandError,
     InvalidParamsError,
 )
-from .models import ActionResult, LightState, Node, NodeData, SensorData
+from .models import ActionResult, LightState, Node, SensorData
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -461,7 +461,11 @@ class TapanaClient:
         return Node.from_api(raw)
 
     def get_nodes(self) -> list[Node]:
-        """Fetch all nodes (devices) registered to the account."""
+        """Fetch all nodes (devices) registered to the account.
+
+        Used only for config-flow discovery (id/name), so extraNodeData is
+        omitted; the returned nodeDataList is intentionally empty.
+        """
         data = self._call(_GET_NODES_QUERY, variables={})
         raw = data.get("getNodes") or []
         return [Node.from_api(n) for n in raw if n]

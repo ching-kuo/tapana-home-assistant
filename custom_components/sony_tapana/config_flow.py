@@ -23,6 +23,14 @@ STEP_USER_SCHEMA = vol.Schema(
 )
 
 
+def _coerce_node_id(value: Any) -> int | None:
+    """Parse a node id, which the cloud returns float-formatted (e.g. "1429475.0")."""
+    try:
+        return int(float(value))
+    except (TypeError, ValueError, OverflowError):
+        return None
+
+
 class SonyTapanaConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     """Handle the initial setup flow for Sony Tapana."""
 
@@ -53,14 +61,18 @@ class SonyTapanaConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 _LOGGER.exception("Unexpected error during config flow")
                 errors["base"] = "unknown"
             else:
-                if not nodes:
+                # Only devices with a numeric id can be queried/controlled.
+                devices = {
+                    str(n.id): (n.name or f"Node {n.id}")
+                    for n in nodes
+                    if _coerce_node_id(n.id) is not None
+                }
+                if not devices:
                     errors["base"] = "no_devices"
                 else:
                     self._email = email
                     self._password = password
-                    self._devices = {
-                        str(n.id): (n.name or f"Node {n.id}") for n in nodes
-                    }
+                    self._devices = devices
                     return await self.async_step_select_device()
 
         return self.async_show_form(
@@ -76,8 +88,8 @@ class SonyTapanaConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         if user_input is not None:
             key = user_input[CONF_NODE_ID]
             title = self._devices.get(key) or f"Sony LGTG (node {key})"
-            # The cloud returns ids as floats (e.g. "1429475.0"); store as int.
-            node_id = int(float(key))
+            # key came from _devices, which only holds coercible ids.
+            node_id = _coerce_node_id(key)
 
             await self.async_set_unique_id(f"sony_tapana_{node_id}")
             self._abort_if_unique_id_configured()

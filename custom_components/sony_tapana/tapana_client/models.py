@@ -13,8 +13,6 @@ class LightState:
     is_on: bool | None = None
     brightness_pct: int | None = None    # 0-100
     color_temp_pct: int | None = None    # 0-100 (0=warm, 100=cool)
-    nightlight_on: bool | None = None
-    mode: str | None = None
 
     @property
     def brightness_ha(self) -> int | None:
@@ -91,7 +89,7 @@ class Node:
         return cls(
             id=str(data.get("id", "")),
             uuid=str(data.get("uuid", "")),
-            name=str(data.get("name", "")),
+            name=str(data.get("name") or ""),
             version=data.get("version"),
             subversion=data.get("subversion"),
             edge_id=str(data.get("edgeId")) if data.get("edgeId") else None,
