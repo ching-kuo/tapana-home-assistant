@@ -1,0 +1,16 @@
+.omx/
+__pycache__/
+*.pyc
+.venv/
+.venv-test/
+
+# Reverse-engineering artifacts: decompiled APKs, keystores, captures, MITM/Frida scripts.
+# Never publish — contains proprietary binaries and potential secrets.
+recon/
+
+# Local-only dev sources, not part of the published HACS plugin.
+/sony_tapana/
+/tests/
+/docs/
+/pyproject.toml
+/.claude/

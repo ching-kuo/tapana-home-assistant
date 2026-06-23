@@ -1,0 +1,13 @@
+{
+  "domain": "sony_tapana",
+  "name": "Sony LGTG Multifunctional Light (Tapana Cloud)",
+  "version": "0.1.0",
+  "config_flow": true,
+  "documentation": "https://github.com/ching-kuo/tapana-home-assistant",
+  "issue_tracker": "https://github.com/ching-kuo/tapana-home-assistant/issues",
+  "requirements": ["pycognito==2023.5.1", "boto3>=1.34.0"],
+  "dependencies": [],
+  "codeowners": ["@ching-kuo"],
+  "iot_class": "cloud_polling",
+  "integration_type": "device"
+}
