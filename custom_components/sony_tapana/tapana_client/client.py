@@ -501,6 +501,9 @@ class TapanaClient:
         raw = data.get("postActions")
         if not raw:
             raise ApiError("postActions returned empty data")
+        # postActions mirrors the requests array, returning a list of results.
+        if isinstance(raw, list):
+            raw = raw[0]
         result = ActionResult.from_api(raw)
         if not result.success:
             raise CommandError(
