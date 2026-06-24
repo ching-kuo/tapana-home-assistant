@@ -8,26 +8,24 @@ from typing import Any
 
 @dataclass
 class LightState:
-    """Current state of the LGTG-200 light."""
+    """Current state of the LGTG-200 light.
+
+    Brightness and color temperature use the device's native 1-255 scale.
+    Brightness is identical to Home Assistant's 0-255 brightness scale, so it
+    is stored and reported verbatim.
+    """
 
     is_on: bool | None = None
-    brightness_pct: int | None = None    # 0-100
-    color_temp_pct: int | None = None    # 0-100 (0=warm, 100=cool)
-
-    @property
-    def brightness_ha(self) -> int | None:
-        """Brightness scaled to Home Assistant range 0-255."""
-        if self.brightness_pct is None:
-            return None
-        return round(self.brightness_pct * 255 / 100)
+    brightness: int | None = None         # native 1-255 (== HA brightness)
+    color_temp_native: int | None = None  # native 1-255 (1=warm, 255=cool)
 
     @property
     def color_temp_kelvin(self) -> int | None:
-        """Color temperature in kelvin (2700=warm, 6500=cool)."""
-        if self.color_temp_pct is None:
+        """Color temperature in kelvin (1->2700 warm, 255->6500 cool)."""
+        if self.color_temp_native is None:
             return None
-        # pct 0 = warm (2700K), pct 100 = cool (6500K)
-        return round(2700 + self.color_temp_pct * (6500 - 2700) / 100)
+        frac = (self.color_temp_native - 1) / (255 - 1)
+        return round(2700 + frac * (6500 - 2700))
 
 
 @dataclass

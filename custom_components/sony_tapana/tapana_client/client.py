@@ -35,6 +35,8 @@ from .const import (
     CMD_SCENE_SAVE,
     IDENTITY_POOL_ID,
     LOGINS_KEY,
+    NATIVE_MAX,
+    NATIVE_MIN,
     REGION,
     SENSOR_CONNECTED,
     SENSOR_HUMIDITY,
@@ -165,16 +167,18 @@ def _parse_light_state(node: Node) -> LightState:
     raw_brightness = by_slot.get(SLOT_BRIGHTNESS)
     if raw_brightness is not None:
         try:
-            state.brightness_pct = int(float(raw_brightness))
+            state.brightness = max(
+                NATIVE_MIN, min(NATIVE_MAX, int(float(raw_brightness)))
+            )
         except (ValueError, TypeError):
             pass
 
     raw_color_temp = by_slot.get(SLOT_COLOR_TEMP)
     if raw_color_temp is not None:
         try:
-            # The phone app can set values >100 on a different scale; clamp so
-            # the kelvin conversion stays within the advertised range.
-            state.color_temp_pct = max(0, min(100, int(float(raw_color_temp))))
+            state.color_temp_native = max(
+                NATIVE_MIN, min(NATIVE_MAX, int(float(raw_color_temp)))
+            )
         except (ValueError, TypeError):
             pass
 
@@ -552,11 +556,11 @@ class TapanaClient:
             },
         )
 
-    def set_brightness(self, brightness_pct: int) -> ActionResult:
-        """Set brightness level (0-100)."""
-        if not 0 <= brightness_pct <= 100:
+    def set_brightness(self, brightness: int) -> ActionResult:
+        """Set brightness (native 1-255, identical to HA's brightness scale)."""
+        if not NATIVE_MIN <= brightness <= NATIVE_MAX:
             raise InvalidParamsError(
-                f"Brightness must be 0-100, got {brightness_pct}"
+                f"Brightness must be {NATIVE_MIN}-{NATIVE_MAX}, got {brightness}"
             )
         return self._light_action(
             ACTION_LIGHT,
@@ -564,15 +568,16 @@ class TapanaClient:
                 "target": "light",
                 "commandType": CMD_BRIGHTNESS,
                 "signalType": SIG_ABSOLUTE,
-                "signal": str(brightness_pct),
+                "signal": str(brightness),
             },
         )
 
-    def set_color_temperature(self, color_temp_pct: int) -> ActionResult:
-        """Set color temperature (0=warmest/2700K, 100=coolest/6500K)."""
-        if not 0 <= color_temp_pct <= 100:
+    def set_color_temperature(self, color_temp: int) -> ActionResult:
+        """Set color temperature (native 1=warmest/2700K, 255=coolest/6500K)."""
+        if not NATIVE_MIN <= color_temp <= NATIVE_MAX:
             raise InvalidParamsError(
-                f"Color temperature must be 0-100, got {color_temp_pct}"
+                f"Color temperature must be {NATIVE_MIN}-{NATIVE_MAX}, "
+                f"got {color_temp}"
             )
         return self._light_action(
             ACTION_LIGHT,
@@ -580,7 +585,7 @@ class TapanaClient:
                 "target": "light",
                 "commandType": CMD_COLOR_TEMP,
                 "signalType": SIG_SET,
-                "signal": str(color_temp_pct),
+                "signal": str(color_temp),
             },
         )
 

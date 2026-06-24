@@ -17,6 +17,7 @@ from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
+from .tapana_client.const import NATIVE_MAX, NATIVE_MIN
 from .tapana_client.exceptions import CommandError, InvalidParamsError
 
 from .const import DOMAIN, KEY_LIGHT_STATE
@@ -24,11 +25,13 @@ from .coordinator import TapanaCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 
-# LGTG-200 color temperature range:
-#   pct 0   -> warm (2700 K)
-#   pct 100 -> cool (6500 K)
+# LGTG-200 color temperature range (device native scale is 1-255):
+#   native 1   -> warm (2700 K)
+#   native 255 -> cool (6500 K)
 MIN_KELVIN = 2700   # warmest
 MAX_KELVIN = 6500   # coolest
+# Brightness and color temperature share the device's native 1-255 scale
+# (NATIVE_MIN/NATIVE_MAX imported from the client const).
 
 
 async def async_setup_entry(
@@ -80,14 +83,15 @@ class SonyTapanaLight(CoordinatorEntity[TapanaCoordinator], LightEntity):
     @property
     def brightness(self) -> int | None:
         state = self._light_state
-        if state is None or state.brightness_pct is None:
+        if state is None:
             return None
-        return state.brightness_ha
+        # Device brightness is already on HA's 0-255 scale.
+        return state.brightness
 
     @property
     def color_temp_kelvin(self) -> int | None:
         state = self._light_state
-        if state is None or state.color_temp_pct is None:
+        if state is None:
             return None
         return state.color_temp_kelvin
 
@@ -99,25 +103,24 @@ class SonyTapanaLight(CoordinatorEntity[TapanaCoordinator], LightEntity):
         if not self.is_on:
             await self.hass.async_add_executor_job(client.turn_on)
 
-        # Apply brightness if provided
+        # Apply brightness if provided. HA's 0-255 scale matches the device's
+        # native scale 1:1; the device rejects 0, so clamp to 1-255.
         if ATTR_BRIGHTNESS in kwargs:
-            ha_brightness = kwargs[ATTR_BRIGHTNESS]
-            pct = round(ha_brightness * 100 / 255)
+            brightness = max(NATIVE_MIN, min(NATIVE_MAX, kwargs[ATTR_BRIGHTNESS]))
             await self.hass.async_add_executor_job(
-                client.set_brightness, max(0, min(100, pct))
+                client.set_brightness, brightness
             )
 
-        # Apply color temperature if provided
+        # Apply color temperature if provided.
         if ATTR_COLOR_TEMP_KELVIN in kwargs:
             kelvin = kwargs[ATTR_COLOR_TEMP_KELVIN]
-            # Convert kelvin -> pct (warmer = lower kelvin = lower pct)
-            pct = round(
-                (kelvin - MIN_KELVIN) * 100 / (MAX_KELVIN - MIN_KELVIN)
-            )
+            # Convert kelvin -> native 1-255 (warmer = lower kelvin = lower native).
+            frac = (kelvin - MIN_KELVIN) / (MAX_KELVIN - MIN_KELVIN)
+            native = round(NATIVE_MIN + frac * (NATIVE_MAX - NATIVE_MIN))
+            native = max(NATIVE_MIN, min(NATIVE_MAX, native))
             try:
-                # Device rejects 0; valid color-temp range is 1-100.
                 await self.hass.async_add_executor_job(
-                    client.set_color_temperature, max(1, min(100, pct))
+                    client.set_color_temperature, native
                 )
             except (CommandError, InvalidParamsError):
                 _LOGGER.warning("Failed to set color temperature to %d K", kelvin)

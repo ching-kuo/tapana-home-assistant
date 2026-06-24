@@ -56,8 +56,15 @@ SIG_SET = "set"
 # keyed by its slot index from compositeId "<nodeId>:<slot>" rather than typeId.
 # These slots are fixed by the LGTG-200 device template.
 SLOT_LIGHT_POWER = 5    # type 704, value "on"/"off"
-SLOT_BRIGHTNESS = 10    # type 107, 0-100
-SLOT_COLOR_TEMP = 11    # type 108, 0-100 (0=warm, 100=cool)
+SLOT_BRIGHTNESS = 10    # type 107, native 1-255
+SLOT_COLOR_TEMP = 11    # type 108, native 1-255 (1=warm, 255=cool)
+
+# Brightness and color temperature share a native 1-255 device scale.
+# Verified live: the device rejects 0 and any value >255 with errorCode 40000.
+# Brightness maps 1:1 onto Home Assistant's own 0-255 brightness scale;
+# color temperature maps 1-255 onto 2700-6500 K (1=warm, 255=cool).
+NATIVE_MIN = 1
+NATIVE_MAX = 255
 
 # Sensor data type IDs (unique within the node, so keyed by typeId)
 SENSOR_ILLUMINANCE_AMB = 102   # Ambient illuminance (lux)
