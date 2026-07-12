@@ -25,7 +25,12 @@ Light capabilities:
 - Brightness adjustment (0–100%)
 - Color temperature (2700 K warm to 6500 K cool)
 
-State is polled from the cloud every 30 seconds.
+State is polled from the cloud every 30 seconds. Commands sent from Home
+Assistant update the entity state immediately (optimistically) and a follow-up
+poll about 10 seconds later confirms against the cloud, which lags device
+commands. Turning the light on restores the brightness and color temperature
+it had before it was turned off (the device itself resets to a low default on
+power-on).
 
 ## Prerequisites
 
