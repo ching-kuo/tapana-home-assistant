@@ -29,8 +29,10 @@ State is polled from the cloud every 30 seconds. Commands sent from Home
 Assistant update the entity state immediately (optimistically) and a follow-up
 poll about 10 seconds later confirms against the cloud, which lags device
 commands. Turning the light on restores the brightness and color temperature
-it had before it was turned off (the device itself resets to a low default on
-power-on).
+last seen while the light was on (the device itself resets to a low default on
+power-on, and reports brightness 0 while off). This memory is in-process, so
+after a Home Assistant restart the first turn-on falls back to the device
+default.
 
 ## Prerequisites
 

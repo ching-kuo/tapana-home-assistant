@@ -167,20 +167,23 @@ def _parse_light_state(node: Node) -> LightState:
     raw_brightness = by_slot.get(SLOT_BRIGHTNESS)
     if raw_brightness is not None:
         try:
-            state.brightness = max(
-                NATIVE_MIN, min(NATIVE_MAX, int(float(raw_brightness)))
-            )
+            value = int(float(raw_brightness))
         except (ValueError, TypeError):
-            pass
+            value = None
+        # The device reports 0 while off; the on-scale is 1-255, so 0 means
+        # "no brightness", not a value to clamp up to 1.
+        if value:
+            state.brightness = max(NATIVE_MIN, min(NATIVE_MAX, value))
 
     raw_color_temp = by_slot.get(SLOT_COLOR_TEMP)
     if raw_color_temp is not None:
         try:
-            state.color_temp_native = max(
-                NATIVE_MIN, min(NATIVE_MAX, int(float(raw_color_temp)))
-            )
+            value = int(float(raw_color_temp))
         except (ValueError, TypeError):
-            pass
+            value = None
+        # Same off-state 0 handling as brightness (scale is 1-255).
+        if value:
+            state.color_temp_native = max(NATIVE_MIN, min(NATIVE_MAX, value))
 
     return state
 

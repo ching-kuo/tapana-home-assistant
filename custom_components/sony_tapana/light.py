@@ -15,7 +15,7 @@ from homeassistant.components.light import (
     LightEntity,
 )
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
@@ -75,6 +75,11 @@ class SonyTapanaLight(CoordinatorEntity[TapanaCoordinator], LightEntity):
         self._optimistic_changes: dict[str, Any] | None = None
         self._reconcile_enabled = True
         self._reconcile_task: asyncio.Task[None] | None = None
+        # Last values seen while the light was ON. While off the cloud
+        # reports brightness 0 (parsed as None), so the live state after an
+        # off-poll holds nothing to restore from.
+        self._last_on_brightness: int | None = None
+        self._last_on_ct: int | None = None
         self._attr_unique_id = f"{entry.entry_id}_light"
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, str(entry.data.get("node_id", entry.entry_id)))},
@@ -82,6 +87,29 @@ class SonyTapanaLight(CoordinatorEntity[TapanaCoordinator], LightEntity):
             manufacturer="Sony",
             model="LGTG Multifunctional Light",
         )
+        # Seed from the first refresh (entities are created after
+        # async_config_entry_first_refresh, so coordinator.data is populated).
+        self._cache_on_state()
+
+    @callback
+    def _handle_coordinator_update(self) -> None:
+        self._cache_on_state()
+        super()._handle_coordinator_update()
+
+    def _cache_on_state(self) -> None:
+        """Remember brightness/color temp while on, for restore after off.
+
+        Runs on every coordinator update, including our own optimistic
+        writes, so values we send are captured too. Off-state values never
+        enter the cache because is_on is False when they are reported.
+        """
+        state = self._light_state
+        if state is None or not state.is_on:
+            return
+        if state.brightness is not None:
+            self._last_on_brightness = state.brightness
+        if state.color_temp_native is not None:
+            self._last_on_ct = state.color_temp_native
 
     @property
     def _light_state(self):
@@ -117,7 +145,6 @@ class SonyTapanaLight(CoordinatorEntity[TapanaCoordinator], LightEntity):
         await self._async_cancel_reconcile()
 
         client = self.coordinator.client
-        prev = self._light_state
         was_off = not self.is_on
 
         # Track what actually reached the device so a mid-sequence command
@@ -131,11 +158,11 @@ class SonyTapanaLight(CoordinatorEntity[TapanaCoordinator], LightEntity):
                 is_on = True
 
             # powerControl "true" resets the device to a low built-in default,
-            # so when the caller gives no explicit values, restore the pre-off
-            # brightness and color temperature from the last known state.
+            # so when the caller gives no explicit values, restore the values
+            # last seen while the light was on (see _cache_on_state).
             brightness = kwargs.get(ATTR_BRIGHTNESS)
-            if brightness is None and was_off and prev is not None:
-                brightness = prev.brightness
+            if brightness is None and was_off:
+                brightness = self._last_on_brightness
             if brightness is not None:
                 # HA's 0-255 scale matches the device's native scale 1:1; the
                 # device rejects 0, so clamp to 1-255.
@@ -152,8 +179,8 @@ class SonyTapanaLight(CoordinatorEntity[TapanaCoordinator], LightEntity):
                 frac = (kelvin - MIN_KELVIN) / (MAX_KELVIN - MIN_KELVIN)
                 native_ct = round(NATIVE_MIN + frac * (NATIVE_MAX - NATIVE_MIN))
                 native_ct = max(NATIVE_MIN, min(NATIVE_MAX, native_ct))
-            elif was_off and prev is not None:
-                native_ct = prev.color_temp_native
+            elif was_off:
+                native_ct = self._last_on_ct
             if native_ct is not None:
                 try:
                     await self.hass.async_add_executor_job(
@@ -232,6 +259,9 @@ class SonyTapanaLight(CoordinatorEntity[TapanaCoordinator], LightEntity):
             await self.coordinator.async_refresh()
             if self._optimistic_changes is optimistic_changes:
                 self._optimistic_changes = None
+                # The refresh listener ran with the overlay still masking
+                # coordinator data; re-cache now that the real state shows.
+                self._cache_on_state()
                 self.async_write_ha_state()
         finally:
             if self._reconcile_task is this_task:
